@@ -51,11 +51,11 @@ if __name__ == "__main__":
     versionSecuencial()
     tiempo2S = time.perf_counter()
 
-    tiempoSecuencial = versionSecuencial()
+    tiempoSecuencial = tiempo2S - tiempo1S
 
 
     tiempo1P = time.perf_counter()
     versionParalela()
     tiempo2P = time.perf_counter()
 
-    tiempoParalelo = versionParalela()
+    tiempoParalelo = tiempo2P - tiempo1P
