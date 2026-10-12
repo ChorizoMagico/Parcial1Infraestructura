@@ -1,5 +1,4 @@
-from concurrent.futures import ThreadPoolExecutor
-import threading
+from mpi4py import MPI
 import time
 import random
 
@@ -71,9 +70,106 @@ def versionSecuencial(matriz, generaciones):
     return matriz
 
 
-def versionParalela():
 
-    return 0
+def calcularBloque(bloque, fila_superior, fila_inferior):
+    # Agregamos temporalmente las filas vecinas.
+    ampliado = [fila_superior] + bloque + [fila_inferior]
+
+    filas_locales = len(bloque)
+    columnas = len(bloque[0])
+    siguiente = [[0] * columnas for _ in range(filas_locales)]
+
+    for i in range(filas_locales):
+        for j in range(columnas):
+            fila = i + 1
+            vecinos = 0
+
+            for fi in range(fila - 1, fila + 2):
+                for co in range(max(0, j - 1), min(columnas, j + 2)):
+                    if (fi, co) != (fila, j):
+                        vecinos += ampliado[fi][co]
+
+            if bloque[i][j] == 1:
+                siguiente[i][j] = int(vecinos in (2, 3))
+            else:
+                siguiente[i][j] = int(vecinos == 3)
+
+    return siguiente
+
+
+def versionParalela(matriz_inicial, generaciones):
+    comunicador = MPI.COMM_WORLD
+    rango = comunicador.Get_rank()
+    cantidad = comunicador.Get_size()
+
+    # Solo el proceso 0 divide la matriz inicial.
+    if rango == 0:
+        total_filas = len(matriz_inicial)
+        base, sobrantes = divmod(total_filas, cantidad)
+
+        bloques = []
+        inicio = 0
+
+        for p in range(cantidad):
+            numero_filas = base + (1 if p < sobrantes else 0)
+            fin = inicio + numero_filas
+            bloques.append(matriz_inicial[inicio:fin])
+            inicio = fin
+    else:
+        bloques = None
+
+    bloque = comunicador.scatter(bloques, root=0)
+
+    if not bloque:
+        raise ValueError(
+            "Cada proceso debe recibir al menos una fila."
+        )
+
+    columnas = len(bloque[0])
+    fila_ceros = [0] * columnas
+
+    for _ in range(generaciones):
+        anterior = rango - 1 if rango > 0 else MPI.PROC_NULL
+        siguiente = rango + 1 if rango < cantidad - 1 else MPI.PROC_NULL
+
+        # Intercambio de la fila superior.
+        fila_superior = comunicador.sendrecv(
+            sendobj=bloque[0],
+            dest=anterior,
+            sendtag=10,
+            source=anterior,
+            recvtag=11
+        )
+
+        # Intercambio de la fila inferior.
+        fila_inferior = comunicador.sendrecv(
+            sendobj=bloque[-1],
+            dest=siguiente,
+            sendtag=11,
+            source=siguiente,
+            recvtag=10
+        )
+
+        if anterior == MPI.PROC_NULL:
+            fila_superior = fila_ceros
+
+        if siguiente == MPI.PROC_NULL:
+            fila_inferior = fila_ceros
+
+        bloque = calcularBloque(
+            bloque, fila_superior, fila_inferior
+        )
+
+    # Reunimos los bloques en el proceso principal.
+    bloques_finales = comunicador.gather(bloque, root=0)
+
+    if rango == 0:
+        resultado = []
+        for parte in bloques_finales:
+            resultado.extend(parte)
+        return resultado
+
+    return None
 
 
 def interfazGrafica():
@@ -84,35 +180,59 @@ def interfazGrafica():
 
 
 if __name__ == "__main__":
+    comunicador = MPI.COMM_WORLD
+    rango = comunicador.Get_rank()
+    cantidad = comunicador.Get_size()
 
-    #creacion matriz
-    FILAS = 500
-    COLUMNAS = 500
+    FILAS = 100
+    COLUMNAS = 100
+    GENERACIONES = 10
 
-    matriz_inicial = crearMatriz(FILAS, COLUMNAS)
-    
+    if FILAS < cantidad:
+        if rango == 0:
+            print("Error: usa menos procesos que filas.")
+    else:
+        # Solo el proceso 0 crea la matriz.
+        if rango == 0:
+            random.seed(42)
+            matriz_inicial = crearMatriz(FILAS, COLUMNAS)
+        else:
+            matriz_inicial = None
 
-    tiempo1S = time.perf_counter()
-    resultadoSecuencial = versionSecuencial(matriz_inicial, 10)
-    tiempo2S = time.perf_counter()
+        # Medimos la versión paralela.
+        comunicador.Barrier()
+        inicio_paralelo = time.perf_counter()
 
-    tiempoSecuencial = tiempo2S - tiempo1S
+        resultado_paralelo = versionParalela(
+            matriz_inicial, GENERACIONES
+        )
 
+        comunicador.Barrier()
+        tiempo_paralelo = time.perf_counter() - inicio_paralelo
 
-    #tiempo1P = time.perf_counter()
-    #resultadoParalelo = versionParalela()
-    #tiempo2P = time.perf_counter()
+        # Solo el proceso 0 compara e imprime.
+        if rango == 0:
+            inicio_secuencial = time.perf_counter()
 
-    #tiempoParalelo = tiempo2P - tiempo1P
+            resultado_secuencial = versionSecuencial(
+                [fila[:] for fila in matriz_inicial],
+                GENERACIONES
+            )
 
-    #aceleracion = tiempoSecuencial / tiempoParalelo
+            tiempo_secuencial = (
+                time.perf_counter() - inicio_secuencial
+            )
 
-    print(f"Tiempo secuencial: {tiempoSecuencial:.3f} segundos")
-    #print(f"Tiempo paralelo: {tiempoParalelo:.3f} segundos")
-    #print(f"Aceleracion: {aceleracion:.3f}")
+            print(f"Procesos MPI: {cantidad}")
+            print(f"Tablero: {FILAS} x {COLUMNAS}")
+            print(f"Generaciones: {GENERACIONES}")
+            print(f"Tiempo secuencial: {tiempo_secuencial:.6f} s")
+            print(f"Tiempo paralelo: {tiempo_paralelo:.6f} s")
 
-    #if resultadoSecuencial == resultadoParalelo:
-        #print("Las dos versiones dan el mismo resultado")
-    #else:
-        #print("Las versiones no coinciden")
+            coinciden = resultado_secuencial == resultado_paralelo
+            print(f"¿Los resultados coinciden?: {coinciden}")
+
+            if tiempo_paralelo > 0:
+                aceleracion = tiempo_secuencial / tiempo_paralelo
+                print(f"Speedup: {aceleracion:.3f}")
 
