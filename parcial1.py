@@ -77,100 +77,7 @@ def versionParalela():
     return 0
 
 
-def interfazGrafica(FILAS, COLUMNAS, matriz_inicial):
-    #Inicialización de la interfaz
-    pygame.init()
-    pygame.font.init()
 
-    #Configuración de la ventana
-    ANCHO_VENTANA = 1280
-    ALTO_VENTANA = 720
-    pantalla = pygame.display.set_mode((ANCHO_VENTANA, ALTO_VENTANA))
-    pygame.display.set_caption ("Juego de la vida - Parcial 1")
-    reloj = pygame.time.Clock()
-
-    fuente = pygame.font.SysFont(None, 24)
-
-
-    # Dimensiones y posición del recuadro de la cuadrícula en la pantalla
-    ANCHO_CUADRICULA = 900
-    ALTO_CUADRICULA = 780
-    INICIO_X = (ANCHO_VENTANA - ANCHO_CUADRICULA) // 2
-    INICIO_Y = 80
-
-    ANCHO_CELDA = ANCHO_CUADRICULA / COLUMNAS
-    ALTO_CELDA = ALTO_CUADRICULA / FILAS
-
-    # Colores
-    COLOR_FONDO_VENTANA = (135, 206, 235)  # Azul claro
-    COLOR_MUERTA = (20, 20, 20)           # Gris oscuro (Célula muerta)
-    COLOR_VIVA = (255, 255, 255)          # Blanco (Célula viva)
-    COLOR_BORDE = (0, 180, 0)             # Verde para los bordes de la cuadrícula
-    COLOR_BOTON = (40, 120, 220)          # Azul botón
-    COLOR_BOTON_HOVER = (60, 150, 250)    # Azul botón al pasar el mouse
-    COLOR_TEXTO = (255, 255, 255)
-
-    
-
-    matriz_actual = matriz_inicial
-    generacion_actual = 1
-    ejecutando = True
-
-    # Rectángulo para el botón "Siguiente"
-    rectangulo_boton = pygame.Rect(ANCHO_VENTANA // 2 - 110, 670, 220, 45)
-
-    while ejecutando: 
-        pantalla.fill(COLOR_FONDO_VENTANA)
-
-        #Gestionar eventos (Cerrar ventana, Clic en botón o Barra Espaciadora)
-        for evento in pygame.event.get():
-            if evento.type == pygame.QUIT:
-                ejecutando = False
-            elif evento.type == pygame.MOUSEBUTTONDOWN:
-                if evento.button == 1: # Clic izquierdo
-                    if rectangulo_boton.collidepoint(evento.pos) and generacion_actual < GENERACIONES:
-                        matriz_actual = siguienteGeneracion(matriz_actual)
-                        generacion_actual += 1
-            elif evento.type == pygame.KEYDOWN:
-                if evento.key == pygame.K_SPACE and generacion_actual < GENERACIONES:
-                    matriz_actual = siguienteGeneracion(matriz_actual)
-                    generacion_actual += 1
-
-        # Dibujar el recuadro de fondo de la cuadrícula
-        pygame.draw.rect(pantalla, COLOR_MUERTA, (INICIO_X, INICIO_Y, ANCHO_CUADRICULA, ALTO_CUADRICULA))
-
-        # Dibujar células y bordes de la cuadrícula
-        for fila in range(FILAS):
-            for columna in range(COLUMNAS):
-                x = INICIO_X + columna * ANCHO_CELDA
-                y = INICIO_Y + fila * ALTO_CELDA
-                rectangulo = pygame.Rect(x, y, ANCHO_CELDA, ALTO_CELDA)
-
-                if matriz_actual[fila][columna] == 1:
-                    pygame.draw.rect(pantalla, COLOR_VIVA, rectangulo)
-                
-                # Dibujar borde de cada celda en color verde
-                pygame.draw.rect(pantalla, COLOR_BORDE, rectangulo, 1)
-
-        # Dibujar Botón interactivo "Siguiente Generación"
-        mouse_pos = pygame.mouse.get_pos()
-        if rectangulo_boton.collidepoint(mouse_pos):
-            color_boton_actual = COLOR_BOTON_HOVER
-        else:
-            color_boton_actual = COLOR_BOTON
-        pygame.draw.rect(pantalla, color_boton_actual, rectangulo_boton, border_radius=8)
-        
-        texto_btn = fuente.render("Siguiente Generación", True, COLOR_TEXTO)
-        pantalla.blit(texto_btn, (rectangulo_boton.centerx - texto_btn.get_width() // 2, rectangulo_boton.centery - texto_btn.get_height() // 2))
-
-        # Dibujar el contador de generaciones (i/n) arriba
-        texto_contador = fuente.render(f"Generación: {generacion_actual} / {GENERACIONES}", True, (20, 40, 60))
-        pantalla.blit(texto_contador, (ANCHO_VENTANA // 2 - texto_contador.get_width() // 2, 30))
-
-        pygame.display.flip()
-        reloj.tick(GENERACIONES)
-
-    pygame.quit()
 
 
 
@@ -180,14 +87,11 @@ if __name__ == "__main__":
     FILAS = 500
     COLUMNAS = 500
 
-    #Generaciones
-    GENERACIONES = 10
-
     matriz_inicial = crearMatriz(FILAS, COLUMNAS)
     
 
     tiempo1S = time.perf_counter()
-    resultadoSecuencial = versionSecuencial(matriz_inicial, GENERACIONES)
+    resultadoSecuencial = versionSecuencial(matriz_inicial, 10)
     tiempo2S = time.perf_counter()
 
     tiempoSecuencial = tiempo2S - tiempo1S
@@ -210,6 +114,5 @@ if __name__ == "__main__":
     #else:
         #print("Las versiones no coinciden")
     
-    print("Iniciando interfaz gráfica... Cierra la ventana de Pygame para salir.")
-    interfazGrafica(100, 100, matriz_inicial)
+    
 
