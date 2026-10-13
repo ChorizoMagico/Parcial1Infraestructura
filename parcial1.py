@@ -310,4 +310,4 @@ if __name__ == "__main__":
 
             if tiempo_paralelo > 0:
                 aceleracion = tiempo_secuencial / tiempo_paralelo
-                print(f"Speedup: {aceleracion:.3f}")
+                print(f"Aceleracion: {aceleracion:.3f}")
