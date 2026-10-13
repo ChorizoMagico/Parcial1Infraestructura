@@ -12,4 +12,4 @@ python -m venv .venv
 pip install -r requirements.txt
 
 4. Ejecutar el archivo:
-python parcial1.py
+python interfazGrafica.py
