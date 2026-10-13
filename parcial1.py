@@ -2,9 +2,9 @@ from concurrent.futures import ThreadPoolExecutor
 import threading
 import time
 import random
-import pygame
 
 
+#Crea una matriz, con una probabilidad para cada celda de que sean celdas vivas
 def crearMatriz(filas, columnas, vivo_porcentaje=0.2):
     matriz=[]
 
@@ -21,6 +21,7 @@ def crearMatriz(filas, columnas, vivo_porcentaje=0.2):
 
     return matriz
 
+#Suma el contenido de las celdas adyacentes a una celda dada
 def vecinosVivos(matriz, fila, columna):
     filas = len(matriz)
     columnas = len(matriz[0])
@@ -36,6 +37,8 @@ def vecinosVivos(matriz, fila, columna):
 
     return contador
 
+#Inicializa una matriz con solo ceros, y luego por cada celda mira si está viva y cuántos vecinos tiene
+#Aplica las condiciones descritas en el juego luego
 def siguienteGeneracion(matriz):
     filas = len(matriz)
     columnas = len(matriz[0])
@@ -64,7 +67,7 @@ def siguienteGeneracion(matriz):
 
     return estado_siguiente
 
-
+#Avanza tantas veces como generaciones haya (Llamando a la función siguienteGeneracion)
 def versionSecuencial(matriz, generaciones):
     for i in range(generaciones):
         matriz = siguienteGeneracion(matriz)
