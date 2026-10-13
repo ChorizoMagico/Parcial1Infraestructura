@@ -36,8 +36,8 @@ def vecinosVivos(matriz, fila, columna):
 
     return contador
 
-#Inicializa una matriz con solo ceros, y luego por cada celda mira si está viva y cuántos vecinos tiene
-#Aplica las condiciones descritas en el juego luego
+#Inicializa una matriz con solo ceros, y luego por cada celda mira si esta viva y cuántos vecinos tiene
+#luego aplica las condiciones descritas en el juego
 def siguienteGeneracion(matriz):
     filas = len(matriz)
     columnas = len(matriz[0])
@@ -66,7 +66,7 @@ def siguienteGeneracion(matriz):
 
     return estado_siguiente
 
-#Avanza tantas veces como generaciones haya (Llamando a la función siguienteGeneracion)
+#Avanza tantas veces como generaciones haya (Llamando a la funcion siguienteGeneracion)
 def versionSecuencial(matriz, generaciones):
     for i in range(generaciones):
         matriz = siguienteGeneracion(matriz)
@@ -74,15 +74,20 @@ def versionSecuencial(matriz, generaciones):
     return matriz
 
 
-# Calcula la siguiente generación de las filas asignadas a un proceso
+# Calcula la siguiente generacion de las filas asignadas a un proceso
 def calcularBloque(bloque, fila_superior, fila_inferior):
     # Agregamos las filas vecinas al bloque
-    ampliado = [fila_superior] + bloque + [fila_inferior]
+    ampliado = []
+
+    ampliado.append(fila_superior)
+    for fila in bloque:
+        ampliado.append(fila)
+    ampliado.append(fila_inferior)
 
     filas_locales = len(bloque)
     columnas = len(bloque[0])
 
-    # Creamos una matriz vacía para guardar la siguiente generación
+    # Creamos una matriz vacia para guardar la siguiente generacion
     siguiente = []
 
     for i in range(filas_locales):
@@ -97,7 +102,7 @@ def calcularBloque(bloque, fila_superior, fila_inferior):
     for i in range(filas_locales):
         for j in range(columnas):
 
-            # La fila real está desplazada una posición
+            # La fila real esta desplazada una posicion
             # porque agregamos una fila superior al bloque
             fila_actual = i + 1
 
@@ -109,7 +114,7 @@ def calcularBloque(bloque, fila_superior, fila_inferior):
                 # Revisamos las columnas cercanas
                 for co in range(j - 1, j + 2):
 
-                    # Ignoramos las columnas que están fuera del tablero
+                    # Ignoramos las columnas que estan fuera del tablero
                     if co < 0 or co >= columnas:
                         continue
 
@@ -132,7 +137,7 @@ def calcularBloque(bloque, fila_superior, fila_inferior):
 
             else:
 
-                # Una célula muerta revive si tiene exactamente
+                # Una celula muerta revive si tiene exactamente
                 # 3 vecinos vivos
                 if vecinos == 3:
                     siguiente[i][j] = 1
@@ -185,10 +190,12 @@ def versionParalela(matriz_inicial, generaciones):
     columnas = len(bloque[0])
 
     # Fila de ceros para los bordes del tablero
-    fila_ceros = [0] * columnas
+    fila_ceros = []
+    for i in range(columnas):
+        fila_ceros.append(0)
 
     # Calculamos cada generación
-    for _ in range(generaciones):
+    for i in range(generaciones):
 
         # Identificamos el proceso anterior
         if rango > 0:
@@ -212,7 +219,7 @@ def versionParalela(matriz_inicial, generaciones):
             recvtag=11
         )
 
-        # Enviamos nuestra última fila al proceso siguiente
+        # Enviamos nuestra ultima fila al proceso siguiente
         # y recibimos la fila inferior que necesitamos
         fila_inferior = comunicador.sendrecv(
             sendobj=bloque[-1],
@@ -231,11 +238,7 @@ def versionParalela(matriz_inicial, generaciones):
             fila_inferior = fila_ceros
 
         # Calculamos la siguiente generación de nuestro bloque
-        bloque = calcularBloque(
-            bloque,
-            fila_superior,
-            fila_inferior
-        )
+        bloque = calcularBloque(bloque, fila_superior, fila_inferior)
 
     # Reunimos los bloques calculados en el proceso 0
     bloques_finales = comunicador.gather(bloque, root=0)
@@ -244,7 +247,8 @@ def versionParalela(matriz_inicial, generaciones):
         resultado = []
 
         for parte in bloques_finales:
-            resultado.extend(parte)
+            for fila in parte:
+                resultado.append(fila)
 
         return resultado
 
@@ -280,24 +284,20 @@ if __name__ == "__main__":
         comunicador.Barrier()
         inicio_paralelo = time.perf_counter()
 
-        resultado_paralelo = versionParalela(
-            matriz_inicial,
-            GENERACIONES
-        )
+        resultado_paralelo = versionParalela(matriz_inicial, GENERACIONES)
 
         comunicador.Barrier()
-        tiempo_paralelo = time.perf_counter() - inicio_paralelo
+        final_paralelo = time.perf_counter()
+        tiempo_paralelo = final_paralelo - inicio_paralelo
 
         # Solo el proceso 0 calcula la versión secuencial y compara
         if rango == 0:
             inicio_secuencial = time.perf_counter()
 
-            resultado_secuencial = versionSecuencial(
-                [fila[:] for fila in matriz_inicial],
-                GENERACIONES
-            )
+            resultado_secuencial = versionSecuencial(matriz_inicial, GENERACIONES)
 
-            tiempo_secuencial = time.perf_counter() - inicio_secuencial
+            final_secuencial = time.perf_counter()
+            tiempo_secuencial = final_secuencial - inicio_secuencial
 
             print(f"Procesos MPI: {cantidad}")
             print(f"Tablero: {FILAS} x {COLUMNAS}")
