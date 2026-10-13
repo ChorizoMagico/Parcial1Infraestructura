@@ -275,7 +275,6 @@ if __name__ == "__main__":
 
         # Solo el proceso 0 crea el tablero inicial
         if rango == 0:
-            random.seed(42)
             matriz_inicial = crearMatriz(FILAS, COLUMNAS)
         else:
             matriz_inicial = None
