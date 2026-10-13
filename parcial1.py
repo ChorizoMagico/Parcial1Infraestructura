@@ -74,69 +74,136 @@ def versionSecuencial(matriz, generaciones):
     return matriz
 
 
-
+# Calcula la siguiente generación de las filas asignadas a un proceso
 def calcularBloque(bloque, fila_superior, fila_inferior):
-    # Agregamos temporalmente las filas vecinas.
+    # Agregamos las filas vecinas al bloque
     ampliado = [fila_superior] + bloque + [fila_inferior]
 
     filas_locales = len(bloque)
     columnas = len(bloque[0])
-    siguiente = [[0] * columnas for _ in range(filas_locales)]
+
+    # Creamos una matriz vacía para guardar la siguiente generación
+    siguiente = []
 
     for i in range(filas_locales):
+        fila_vacia = []
+
         for j in range(columnas):
-            fila = i + 1
+            fila_vacia.append(0)
+
+        siguiente.append(fila_vacia)
+
+    # Recorremos cada celda del bloque
+    for i in range(filas_locales):
+        for j in range(columnas):
+
+            # La fila real está desplazada una posición
+            # porque agregamos una fila superior al bloque
+            fila_actual = i + 1
+
             vecinos = 0
 
-            for fi in range(fila - 1, fila + 2):
-                for co in range(max(0, j - 1), min(columnas, j + 2)):
-                    if (fi, co) != (fila, j):
-                        vecinos += ampliado[fi][co]
+            # Revisamos las filas cercanas
+            for fi in range(fila_actual - 1, fila_actual + 2):
 
+                # Revisamos las columnas cercanas
+                for co in range(j - 1, j + 2):
+
+                    # Ignoramos las columnas que están fuera del tablero
+                    if co < 0 or co >= columnas:
+                        continue
+
+                    # No contamos la celda que estamos evaluando
+                    if fi == fila_actual and co == j:
+                        continue
+
+                    # Sumamos el estado de la celda vecina
+                    vecinos += ampliado[fi][co]
+
+            # Aplicamos las reglas del Juego de la Vida
             if bloque[i][j] == 1:
-                siguiente[i][j] = int(vecinos in (2, 3))
+
+                # Una célula viva muere si tiene menos de 2
+                # o más de 3 vecinos vivos
+                if vecinos < 2 or vecinos > 3:
+                    siguiente[i][j] = 0
+                else:
+                    siguiente[i][j] = 1
+
             else:
-                siguiente[i][j] = int(vecinos == 3)
+
+                # Una célula muerta revive si tiene exactamente
+                # 3 vecinos vivos
+                if vecinos == 3:
+                    siguiente[i][j] = 1
+                else:
+                    siguiente[i][j] = 0
 
     return siguiente
 
 
+# Divide la matriz, calcula generaciones y reúne el resultado
 def versionParalela(matriz_inicial, generaciones):
     comunicador = MPI.COMM_WORLD
     rango = comunicador.Get_rank()
     cantidad = comunicador.Get_size()
 
-    # Solo el proceso 0 divide la matriz inicial.
+    # Solo el proceso 0 divide la matriz inicial
     if rango == 0:
         total_filas = len(matriz_inicial)
-        base, sobrantes = divmod(total_filas, cantidad)
+
+        # Calculamos cuántas filas recibe cada proceso
+        base = total_filas // cantidad
+        sobrantes = total_filas % cantidad
 
         bloques = []
         inicio = 0
 
         for p in range(cantidad):
-            numero_filas = base + (1 if p < sobrantes else 0)
+            numero_filas = base
+
+            # Repartimos las filas sobrantes entre los primeros procesos
+            if p < sobrantes:
+                numero_filas = numero_filas + 1
+
             fin = inicio + numero_filas
+
+            # Guardamos las filas que le corresponden al proceso
             bloques.append(matriz_inicial[inicio:fin])
+
             inicio = fin
+
     else:
         bloques = None
 
+    # Cada proceso recibe su bloque de filas
     bloque = comunicador.scatter(bloques, root=0)
 
     if not bloque:
-        raise ValueError(
-            "Cada proceso debe recibir al menos una fila."
-        )
+        raise ValueError("Cada proceso debe recibir al menos una fila.")
 
     columnas = len(bloque[0])
+
+    # Fila de ceros para los bordes del tablero
     fila_ceros = [0] * columnas
 
+    # Calculamos cada generación
     for _ in range(generaciones):
-        anterior = rango - 1 if rango > 0 else MPI.PROC_NULL
-        siguiente = rango + 1 if rango < cantidad - 1 else MPI.PROC_NULL
 
-        # Intercambio de la fila superior.
+        # Identificamos el proceso anterior
+        if rango > 0:
+            anterior = rango - 1
+        else:
+            anterior = MPI.PROC_NULL
+
+        # Identificamos el proceso siguiente
+        if rango < cantidad - 1:
+            siguiente = rango + 1
+        else:
+            siguiente = MPI.PROC_NULL
+
+        # Enviamos nuestra primera fila al proceso anterior
+        # y recibimos la fila superior que necesitamos
         fila_superior = comunicador.sendrecv(
             sendobj=bloque[0],
             dest=anterior,
@@ -145,7 +212,8 @@ def versionParalela(matriz_inicial, generaciones):
             recvtag=11
         )
 
-        # Intercambio de la fila inferior.
+        # Enviamos nuestra última fila al proceso siguiente
+        # y recibimos la fila inferior que necesitamos
         fila_inferior = comunicador.sendrecv(
             sendobj=bloque[-1],
             dest=siguiente,
@@ -154,30 +222,34 @@ def versionParalela(matriz_inicial, generaciones):
             recvtag=10
         )
 
+        # Si no existe un proceso anterior, usamos una fila de ceros
         if anterior == MPI.PROC_NULL:
             fila_superior = fila_ceros
 
+        # Si no existe un proceso siguiente, usamos una fila de ceros
         if siguiente == MPI.PROC_NULL:
             fila_inferior = fila_ceros
 
+        # Calculamos la siguiente generación de nuestro bloque
         bloque = calcularBloque(
-            bloque, fila_superior, fila_inferior
+            bloque,
+            fila_superior,
+            fila_inferior
         )
 
-    # Reunimos los bloques en el proceso principal.
+    # Reunimos los bloques calculados en el proceso 0
     bloques_finales = comunicador.gather(bloque, root=0)
 
     if rango == 0:
         resultado = []
+
         for parte in bloques_finales:
             resultado.extend(parte)
+
         return resultado
 
+    # Los demás procesos no reconstruyen la matriz completa
     return None
-
-
-
-
 
 
 if __name__ == "__main__":
@@ -189,29 +261,34 @@ if __name__ == "__main__":
     COLUMNAS = 100
     GENERACIONES = 10
 
+    # Verificamos que cada proceso pueda recibir al menos una fila
     if FILAS < cantidad:
+
         if rango == 0:
             print("Error: usa menos procesos que filas.")
+
     else:
-        # Solo el proceso 0 crea la matriz.
+
+        # Solo el proceso 0 crea el tablero inicial
         if rango == 0:
             random.seed(42)
             matriz_inicial = crearMatriz(FILAS, COLUMNAS)
         else:
             matriz_inicial = None
 
-        # Medimos la versión paralela.
+        # Medimos el tiempo de la versión paralela
         comunicador.Barrier()
         inicio_paralelo = time.perf_counter()
 
         resultado_paralelo = versionParalela(
-            matriz_inicial, GENERACIONES
+            matriz_inicial,
+            GENERACIONES
         )
 
         comunicador.Barrier()
         tiempo_paralelo = time.perf_counter() - inicio_paralelo
 
-        # Solo el proceso 0 compara e imprime.
+        # Solo el proceso 0 calcula la versión secuencial y compara
         if rango == 0:
             inicio_secuencial = time.perf_counter()
 
@@ -220,9 +297,7 @@ if __name__ == "__main__":
                 GENERACIONES
             )
 
-            tiempo_secuencial = (
-                time.perf_counter() - inicio_secuencial
-            )
+            tiempo_secuencial = time.perf_counter() - inicio_secuencial
 
             print(f"Procesos MPI: {cantidad}")
             print(f"Tablero: {FILAS} x {COLUMNAS}")
@@ -236,4 +311,3 @@ if __name__ == "__main__":
             if tiempo_paralelo > 0:
                 aceleracion = tiempo_secuencial / tiempo_paralelo
                 print(f"Speedup: {aceleracion:.3f}")
-
