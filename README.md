@@ -13,3 +13,16 @@ pip install -r requirements.txt
 
 4. Ejecutar el archivo:
 python interfazGrafica.py
+
+Para ejecutar el programa (sin interfaz gráfica):
+
+1. Para Windows, primero se debe instalar Microsoft MPI (runtime y SDK) de la página oficial de Microsoft, y luego instalar la librería con:
+pip install mpi4py
+
+2. Luego, el programa se ejecuta en la consola indicando la cantidad de procesos. Por ejemplo, para 4 procesos, se ejecuta:
+mpiexec -n 4 python parcial1.py
+
+3. Para probar con distintas cantidades de procesos:
+mpiexec -n 2 python parcial1.py
+mpiexec -n 4 python parcial1.py
+mpiexec -n 8 python parcial1.py
