@@ -20,51 +20,12 @@ def crearMatriz(filas, columnas, vivo_porcentaje=0.2):
 
     return matriz
 
-#Suma el contenido de las celdas adyacentes a una celda dada
-def vecinosVivos(matriz, fila, columna):
-    filas = len(matriz)
-    columnas = len(matriz[0])
-    contador = 0
-
-    # range incluye el valor inicial y excluye el final, por eso se suma 2, si pusieramos fila + 1 solo contaria la fila de arriba y de en medio, pero no la de abajo
-    for i in range(fila - 1, fila + 2):
-        for j in range(columna - 1, columna + 2):
-            if 0 <= i < filas and 0 <= j < columnas:  # verifica que no se salga de los limites de la matriz
-                # si la posicion es diferente a la posicion de la celula que estamos evaluando
-                if (i, j) != (fila, columna):
-                    contador = contador + matriz[i][j]
-
-    return contador
-
-#Inicializa una matriz con solo ceros, y luego por cada celda mira si esta viva y cuántos vecinos tiene
-#luego aplica las condiciones descritas en el juego
+#La version secuencial usa el mismo cálculo por celda que la paralela
+# (calcularBloque con filas de ceros arriba y abajo). Así la aceleración mide solo el efecto
+# del paralelismo y no la diferencia entre dos formas de contar vecinos.
 def siguienteGeneracion(matriz):
-    filas = len(matriz)
-    columnas = len(matriz[0])
-    
-    estado_siguiente = []
-    
-    for i in range(filas):
-        fila = []
-        for j in range(columnas):
-            fila.append(0)
-        estado_siguiente.append(fila)
-
-    for i in range(filas):
-        for j in range(columnas):
-            vecinos = vecinosVivos(matriz, i, j)
-            if matriz[i][j] == 1:  # si la celula esta viva
-                if vecinos < 2 or vecinos > 3:
-                    estado_siguiente[i][j] = 0  # muere por soledad o sobrepoblacion
-                else:
-                    estado_siguiente[i][j] = 1  # sigue viva
-            else:  # si la celula esta muerta
-                if vecinos == 3:
-                    estado_siguiente[i][j] = 1  # nace
-                else:
-                    estado_siguiente[i][j] = 0  # sigue muerta
-
-    return estado_siguiente
+    fila_ceros = [0] * len(matriz[0])
+    return calcularBloque(matriz, fila_ceros, fila_ceros)
 
 #Avanza tantas veces como generaciones haya (Llamando a la funcion siguienteGeneracion)
 def versionSecuencial(matriz, generaciones):
@@ -254,6 +215,42 @@ def versionParalela(matriz_inicial, generaciones):
 
     # Los demás procesos no reconstruyen la matriz completa
     return None
+
+# Funciones que usan la interfaz y el benchmark 
+ 
+# Ejecuta la version secuencial y devuelve (resultado, tiempo en segundos)
+def medirSecuencial(matriz, generaciones):
+    inicio = time.perf_counter()
+    resultado = versionSecuencial(matriz, generaciones)
+    return resultado, time.perf_counter() - inicio
+ 
+ 
+# Ejecuta la version paralela y devuelve (resultado, tiempo en segundos).
+# Todos los procesos deben llamarla a la vez (el resultado solo es valido en el proceso 0).
+# El tiempo incluye repartir la matriz (scatter) y reunir el resultado (gather).
+def medirParalela(matriz, generaciones):
+    comunicador = MPI.COMM_WORLD
+    comunicador.Barrier()
+    inicio = time.perf_counter()
+ 
+    resultado = versionParalela(matriz, generaciones)
+ 
+    comunicador.Barrier()
+    return resultado, time.perf_counter() - inicio
+ 
+ 
+# Bucle de los procesos 1..N-1 cuando el proceso 0 maneja la interfaz grafica:
+# esperan una orden del proceso 0 y participan en la version paralela cuando se les pide.
+def esperarOrdenes():
+    comunicador = MPI.COMM_WORLD
+ 
+    while True:
+        orden, generaciones = comunicador.bcast(None, root=0)
+ 
+        if orden == "salir":
+            break
+ 
+        medirParalela(None, generaciones)
 
 
 if __name__ == "__main__":
