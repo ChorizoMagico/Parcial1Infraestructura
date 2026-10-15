@@ -54,7 +54,7 @@ def correr(python, script, procesos, tam, generaciones, modo):
     raise RuntimeError("No se obtuvo tiempo.\nSTDOUT:\n" + r.stdout + "\nSTDERR:\n" + r.stderr)
 
 
-# ---------------------- Guardar (actualiza si repites) ----------------------
+# ---------------------- Guardar (actualiza si se repite) ----------------------
 def guardar(tam, procs, gen, t_sec, t_par):
     datos = {}
     if os.path.exists(ARCHIVO_RESULTADOS):
@@ -73,7 +73,7 @@ def guardar(tam, procs, gen, t_sec, t_par):
 
 # ---------------------- Modo medir ----------------------
 def medir(tam, procesos, generaciones):
-    python = sys.executable          # el del venv, porque corriste con `python`
+    python = sys.executable          # el del venv, porque corre con `python`
     script = os.path.abspath(__file__)
 
     print(f"Secuencial (1 proceso, {tam}x{tam}, {generaciones} gen)...")
