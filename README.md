@@ -15,11 +15,9 @@ python -m pip install -r requirements.txt
 
 5. Si la instalación con requirements falla, instalar las dependencias manualmente 
 python -m pip install mpi4py
-python -m pip install pygame
+python -m pip install pygame-ce
 python -m pip install matplotlib
 
-Si la versión de python es muy reciente (de Python 3.12 para arriba), utilizar pygame-ce en lugar de pygame
-python -m pip install pygame-ce
 
 
 Para ejecutar el programa (sin interfaz gráfica):
